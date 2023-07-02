@@ -20,7 +20,8 @@ cover: test ## Run tests and generate coverage.
 release: goreleaser ## Test release locally.
 	$(GORELEASER) release --snapshot --rm-dist
 
-RUN_FLAGS ?= --log-level=debug --log-dev --config-dir=mariadb/config --state-dir=mariadb/state
+export KUBECONFIG ?= $(HOME)/.kube/config
+RUN_FLAGS ?= --log-dev --log-level=debug --log-time-encoder=iso8601 --mariadb-name=mariadb-galera --mariadb-namespace=default --config-dir=mariadb/config --state-dir=mariadb/state
 .PHONY: run
 run: ## Run init from your host.
 	go run main.go $(RUN_FLAGS)
