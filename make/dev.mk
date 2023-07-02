@@ -20,8 +20,16 @@ cover: test ## Run tests and generate coverage.
 release: goreleaser ## Test release locally.
 	$(GORELEASER) release --snapshot --rm-dist
 
+
+.PHONY: dir
+dir: ## Create config and state directories for local development.
+	mkdir -p mariadb/config
+	mkdir -p mariadb/state
+
 export KUBECONFIG ?= $(HOME)/.kube/config
+export HOSTNAME ?= mariadb-galera-0
+export MARIADB_ROOT_PASSWORD ?= mariadb
 RUN_FLAGS ?= --log-dev --log-level=debug --log-time-encoder=iso8601 --mariadb-name=mariadb-galera --mariadb-namespace=default --config-dir=mariadb/config --state-dir=mariadb/state
 .PHONY: run
-run: ## Run init from your host.
+run: dir ## Run init from your host.
 	go run main.go $(RUN_FLAGS)

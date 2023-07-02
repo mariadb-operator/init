@@ -8,15 +8,19 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/mariadb-operator/agent/pkg/galera"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	ctrlresources "github.com/mariadb-operator/mariadb-operator/controllers/resources"
 	"github.com/mariadb-operator/mariadb-operator/pkg/statefulset"
 )
 
 const (
-	BootstrapFile = `[galera]
-wsrep_new_cluster="ON"`
+	ConfigFileName    = "0-galera.cnf"
+	BootstrapFileName = galera.BootstrapFileName
 )
+
+var BootstrapFile = []byte(`[galera]
+wsrep_new_cluster="ON"`)
 
 type ConfigFile struct {
 	mariadb *mariadbv1alpha1.MariaDB

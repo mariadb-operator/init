@@ -10,7 +10,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/mariadb-operator/agent/pkg/filemanager"
 	"github.com/mariadb-operator/agent/pkg/logger"
+	"github.com/mariadb-operator/init/pkg/config"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -61,28 +63,48 @@ func main() {
 	if err != nil {
 		log.Fatalf("error creating logger: %v", err)
 	}
-	logger.Info("Staring MariaDB init")
+	logger.Info("Staring init")
 
-	config, err := config()
+	restConfig, err := restConfig()
 	if err != nil {
 		logger.Error(err, "Error getting Kubernetes config")
 		os.Exit(1)
 	}
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		logger.Error(err, "Error getting Kubernetes clientset")
+		logger.Error(err, "Error creating Kubernetes clientset")
 		os.Exit(1)
 	}
-
 	mdb, err := mariadb(ctx, mariadbName, mariadbNamespace, clientset)
 	if err != nil {
 		logger.Error(err, "Error getting MariaDB")
 		os.Exit(1)
 	}
-	logger.V(1).Info("got MariaDB", "mariadb", mdb)
+
+	fileManager, err := filemanager.NewFileManager(configDir, stateDir)
+	if err != nil {
+		logger.Error(err, "Error creating file manager")
+		os.Exit(1)
+	}
+	configBytes, err := config.NewConfigFile(mdb).Marshal()
+	if err != nil {
+		logger.Error(err, "Error getting galera config")
+		os.Exit(1)
+	}
+	logger.Info("Configuring Galera")
+	if err := fileManager.WriteConfigFile(config.ConfigFileName, configBytes); err != nil {
+		logger.Error(err, "Error writing galera config")
+		os.Exit(1)
+	}
+	logger.Info("Configuring bootstrap")
+	if err := fileManager.WriteConfigFile(config.BootstrapFileName, config.BootstrapFile); err != nil {
+		logger.Error(err, "Error writing bootstrap config")
+		os.Exit(1)
+	}
+	logger.Info("Init done")
 }
 
-func config() (*rest.Config, error) {
+func restConfig() (*rest.Config, error) {
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		return clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
