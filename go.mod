@@ -3,6 +3,7 @@ module github.com/mariadb-operator/init
 go 1.20
 
 require (
+	github.com/go-logr/logr v1.2.4
 	github.com/mariadb-operator/agent v0.0.1
 	github.com/mariadb-operator/mariadb-operator v0.0.16-0.20230702105210-e7121043bc33
 	k8s.io/apimachinery v0.24.2
@@ -18,7 +19,6 @@ require (
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/zapr v1.2.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
