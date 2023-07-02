@@ -9,14 +9,15 @@ import (
 
 func TestConfigMarshal(t *testing.T) {
 	tests := []struct {
-		name       string
-		mariadb    *mariadbv1alpha1.MariaDB
-		env        map[string]string
-		wantConfig string
-		wantErr    bool
+		name                string
+		mariadb             *mariadbv1alpha1.MariaDB
+		podName             string
+		mariadbRootPassword string
+		wantConfig          string
+		wantErr             bool
 	}{
 		{
-			name: "no env",
+			name: "no replicas",
 			mariadb: &mariadbv1alpha1.MariaDB{
 				ObjectMeta: v1.ObjectMeta{
 					Name:      "mariadb-galera",
@@ -27,12 +28,13 @@ func TestConfigMarshal(t *testing.T) {
 						SST:            mariadbv1alpha1.SSTRsync,
 						ReplicaThreads: 1,
 					},
-					Replicas: 3,
+					Replicas: 0,
 				},
 			},
-			env:        map[string]string{},
-			wantConfig: "",
-			wantErr:    true,
+			podName:             "mariadb-galera-0",
+			mariadbRootPassword: "mariadb",
+			wantConfig:          "",
+			wantErr:             true,
 		},
 		{
 			name: "rsync",
@@ -49,10 +51,8 @@ func TestConfigMarshal(t *testing.T) {
 					Replicas: 3,
 				},
 			},
-			env: map[string]string{
-				"HOSTNAME":              "mariadb-galera-0",
-				"MARIADB_ROOT_PASSWORD": "foo",
-			},
+			podName:             "mariadb-galera-0",
+			mariadbRootPassword: "mariadb",
 			//nolint:lll
 			wantConfig: `[mysqld]
 bind-address=0.0.0.0
@@ -89,10 +89,8 @@ wsrep_sst_method="rsync"
 					Replicas: 3,
 				},
 			},
-			env: map[string]string{
-				"HOSTNAME":              "mariadb-galera-1",
-				"MARIADB_ROOT_PASSWORD": "foo",
-			},
+			podName:             "mariadb-galera-1",
+			mariadbRootPassword: "mariadb",
 			//nolint:lll
 			wantConfig: `[mysqld]
 bind-address=0.0.0.0
@@ -111,7 +109,7 @@ wsrep_slave_threads=2
 wsrep_node_address="mariadb-galera-1.mariadb-galera-internal.default.svc.cluster.local"
 wsrep_node_name="mariadb-galera-1"
 wsrep_sst_method="mariabackup"
-wsrep_sst_auth="root:foo"
+wsrep_sst_auth="root:mariadb"
 `,
 			wantErr: false,
 		},
@@ -119,11 +117,7 @@ wsrep_sst_auth="root:foo"
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := NewConfigFile(tt.mariadb)
-			for k, v := range tt.env {
-				t.Setenv(k, v)
-			}
-
-			bytes, err := config.Marshal()
+			bytes, err := config.Marshal(tt.podName, tt.mariadbRootPassword)
 			if tt.wantErr && err == nil {
 				t.Fatal("error expected, got nil")
 			}

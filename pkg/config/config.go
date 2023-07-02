@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"text/template"
 
@@ -32,7 +31,7 @@ func NewConfigFile(mariadb *mariadbv1alpha1.MariaDB) *ConfigFile {
 	}
 }
 
-func (c *ConfigFile) Marshal() ([]byte, error) {
+func (c *ConfigFile) Marshal(podName, mariadbRootPassword string) ([]byte, error) {
 	tpl := createTpl("galera", `[mysqld]
 bind-address=0.0.0.0
 default_storage_engine=InnoDB
@@ -63,14 +62,6 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 	if err != nil {
 		return nil, fmt.Errorf("error getting SST: %v", err)
 	}
-	hostname := os.Getenv("HOSTNAME")
-	if hostname == "" {
-		return nil, errors.New("HOSTNAME environment variable not found")
-	}
-	rootPassword := os.Getenv("MARIADB_ROOT_PASSWORD")
-	if rootPassword == "" {
-		return nil, errors.New("MARIADB_ROOT_PASSWORD environment variable not found")
-	}
 
 	err = tpl.Execute(buf, struct {
 		ClusterAddress string
@@ -83,14 +74,14 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 	}{
 		ClusterAddress: clusterAddr,
 		Threads:        c.mariadb.Spec.Galera.ReplicaThreads,
-		Pod:            hostname,
+		Pod:            podName,
 		Service: statefulset.ServiceFQDNWithService(
 			c.mariadb.ObjectMeta,
 			ctrlresources.InternalServiceKey(c.mariadb).Name,
 		),
 		SST:          sst,
 		SSTAuth:      c.mariadb.Spec.Galera.SST == mariadbv1alpha1.SSTMariaBackup || c.mariadb.Spec.Galera.SST == mariadbv1alpha1.SSTMysqldump,
-		RootPassword: rootPassword,
+		RootPassword: mariadbRootPassword,
 	})
 	if err != nil {
 		return nil, err

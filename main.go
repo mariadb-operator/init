@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -20,16 +21,20 @@ import (
 )
 
 var (
-	logLevel       string
-	logTimeEncoder string
-	logDev         bool
-
-	configDir string
-	stateDir  string
-
+	logLevel         string
+	logTimeEncoder   string
+	logDev           bool
+	configDir        string
+	stateDir         string
 	mariadbName      string
 	mariadbNamespace string
 )
+
+type Env struct {
+	podName             string
+	podNamespace        string
+	mariadbRootPassword string
+}
 
 func main() {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level to use, one of: "+
@@ -37,13 +42,10 @@ func main() {
 	flag.StringVar(&logTimeEncoder, "log-time-encoder", "epoch", "Log time encoder to use, one of: "+
 		"epoch, millis, nano, iso8601, rfc3339 or rfc3339nano")
 	flag.BoolVar(&logDev, "log-dev", false, "Enable development logs")
-
 	flag.StringVar(&configDir, "config-dir", "/etc/mysql/mariadb.conf.d", "The directory that contains MariaDB configuration files")
 	flag.StringVar(&stateDir, "state-dir", "/var/lib/mysql", "The directory that contains MariaDB state files")
-
 	flag.StringVar(&mariadbName, "mariadb-name", "", "The name of the MariaDB to be initialized")
 	flag.StringVar(&mariadbNamespace, "mariadb-namespace", "", "The namespace of the MariaDB to be initialized")
-
 	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), []os.Signal{
@@ -61,9 +63,15 @@ func main() {
 		logger.WithDevelopment(logDev),
 	)
 	if err != nil {
-		log.Fatalf("error creating logger: %v", err)
+		log.Fatalf("Error creating logger: %v", err)
 	}
 	logger.Info("Staring init")
+
+	env, err := env()
+	if err != nil {
+		logger.Error(err, "Missing environment variables")
+		os.Exit(1)
+	}
 
 	restConfig, err := restConfig()
 	if err != nil {
@@ -86,14 +94,14 @@ func main() {
 		logger.Error(err, "Error creating file manager")
 		os.Exit(1)
 	}
-	configBytes, err := config.NewConfigFile(mdb).Marshal()
+	configBytes, err := config.NewConfigFile(mdb).Marshal(env.podName, env.mariadbRootPassword)
 	if err != nil {
-		logger.Error(err, "Error getting galera config")
+		logger.Error(err, "Error getting Galera config")
 		os.Exit(1)
 	}
 	logger.Info("Configuring Galera")
 	if err := fileManager.WriteConfigFile(config.ConfigFileName, configBytes); err != nil {
-		logger.Error(err, "Error writing galera config")
+		logger.Error(err, "Error writing Galera config")
 		os.Exit(1)
 	}
 	logger.Info("Configuring bootstrap")
@@ -102,6 +110,26 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("Init done")
+}
+
+func env() (*Env, error) {
+	podName := os.Getenv("POD_NAME")
+	if podName == "" {
+		return nil, errors.New("environment variable 'POD_NAME' is required")
+	}
+	podNamespace := os.Getenv("POD_NAMESPACE")
+	if podNamespace == "" {
+		return nil, errors.New("environment variable 'POD_NAMESPACE' is required")
+	}
+	mariadbRootPassword := os.Getenv("MARIADB_ROOT_PASSWORD")
+	if mariadbRootPassword == "" {
+		return nil, errors.New("environment variable 'MARIADB_ROOT_PASSWORD' is required")
+	}
+	return &Env{
+		podName:             podName,
+		podNamespace:        podNamespace,
+		mariadbRootPassword: mariadbRootPassword,
+	}, nil
 }
 
 func restConfig() (*rest.Config, error) {
