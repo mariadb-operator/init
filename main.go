@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/mariadb-operator/agent/pkg/logger"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
@@ -42,6 +44,15 @@ func main() {
 
 	flag.Parse()
 
+	ctx, cancel := signal.NotifyContext(context.Background(), []os.Signal{
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGKILL,
+		syscall.SIGHUP,
+		syscall.SIGQUIT}...,
+	)
+	defer cancel()
+
 	logger, err := logger.NewLogger(
 		logger.WithLogLevel(logLevel),
 		logger.WithTimeEncoder(logTimeEncoder),
@@ -63,7 +74,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mdb, err := mariadb(context.TODO(), mariadbName, mariadbNamespace, clientset)
+	mdb, err := mariadb(ctx, mariadbName, mariadbNamespace, clientset)
 	if err != nil {
 		logger.Error(err, "Error getting MariaDB")
 		os.Exit(1)
