@@ -109,28 +109,40 @@ func main() {
 		os.Exit(1)
 	}
 
+	entries, err := os.ReadDir(stateDir)
+	if err != nil {
+		logger.Error(err, "Error reading state directory")
+		os.Exit(1)
+	}
+	if len(entries) > 0 {
+		logger.Info("Already initialized. Init done")
+		os.Exit(0)
+	}
+
 	idx, err := statefulset.PodIndex(env.podName)
 	if err != nil {
 		logger.Error(err, "error getting index from Pod", "pod", env.podName)
 		os.Exit(1)
 	}
-
 	if *idx == 0 {
 		logger.Info("Configuring bootstrap")
 		if err := fileManager.WriteConfigFile(config.BootstrapFileName, config.BootstrapFile); err != nil {
 			logger.Error(err, "Error writing bootstrap config")
 			os.Exit(1)
 		}
-	} else {
-		previousPodName, err := previousPodName(mdb, *idx)
-		if err != nil {
-			logger.Error(err, "error getting previous Pod")
-			os.Exit(1)
-		}
-		if err := waitForPreviousPod(ctx, mdb, previousPodName, clientset, logger); err != nil {
-			logger.Error(err, "error getting previous Pod", "pod", previousPodName)
-			os.Exit(1)
-		}
+		logger.Info("Init done")
+		os.Exit(0)
+	}
+
+	previousPodName, err := previousPodName(mdb, *idx)
+	if err != nil {
+		logger.Error(err, "Error getting previous Pod")
+		os.Exit(1)
+	}
+	logger.Info("Waiting for previous Pod to be ready", "pod", previousPodName)
+	if err := waitForPreviousPod(ctx, mdb, previousPodName, clientset, logger); err != nil {
+		logger.Error(err, "Error waiting for previous Pod to be ready", "pod", previousPodName)
+		os.Exit(1)
 	}
 	logger.Info("Init done")
 }
@@ -183,6 +195,7 @@ func waitForPreviousPod(ctx context.Context, mariadb *mariadbv1alpha1.MariaDB, p
 	return wait.PollImmediateUntilWithContext(ctx, 1*time.Second, func(context.Context) (bool, error) {
 		previousPod, err := clientset.CoreV1().Pods(mariadb.Namespace).Get(ctx, previousPodName, metav1.GetOptions{})
 		if err != nil {
+			logger.V(1).Info("Error getting previous Pod", "err", err)
 			return false, nil
 		}
 		if !pod.PodReady(previousPod) {
