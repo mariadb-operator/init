@@ -17,7 +17,7 @@ import (
 	"github.com/mariadb-operator/agent/pkg/logger"
 	"github.com/mariadb-operator/init/pkg/config"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	"github.com/mariadb-operator/mariadb-operator/pkg/pod"
+	mariadbpod "github.com/mariadb-operator/mariadb-operator/pkg/pod"
 	"github.com/mariadb-operator/mariadb-operator/pkg/statefulset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -36,7 +36,7 @@ var (
 	mariadbNamespace string
 )
 
-type Env struct {
+type environment struct {
 	podName             string
 	mariadbRootPassword string
 }
@@ -140,14 +140,14 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("Waiting for previous Pod to be ready", "pod", previousPodName)
-	if err := waitForPreviousPod(ctx, mdb, previousPodName, clientset, logger); err != nil {
+	if err := waitForPodReady(ctx, mdb, previousPodName, clientset, logger); err != nil {
 		logger.Error(err, "Error waiting for previous Pod to be ready", "pod", previousPodName)
 		os.Exit(1)
 	}
 	logger.Info("Init done")
 }
 
-func env() (*Env, error) {
+func env() (*environment, error) {
 	podName := os.Getenv("POD_NAME")
 	if podName == "" {
 		return nil, errors.New("environment variable 'POD_NAME' is required")
@@ -156,7 +156,7 @@ func env() (*Env, error) {
 	if mariadbRootPassword == "" {
 		return nil, errors.New("environment variable 'MARIADB_ROOT_PASSWORD' is required")
 	}
-	return &Env{
+	return &environment{
 		podName:             podName,
 		mariadbRootPassword: mariadbRootPassword,
 	}, nil
@@ -190,19 +190,19 @@ func previousPodName(mariadb *mariadbv1alpha1.MariaDB, podIndex int) (string, er
 	return statefulset.PodName(mariadb.ObjectMeta, previousPodIndex), nil
 }
 
-func waitForPreviousPod(ctx context.Context, mariadb *mariadbv1alpha1.MariaDB, previousPodName string, clientset *kubernetes.Clientset,
+func waitForPodReady(ctx context.Context, mariadb *mariadbv1alpha1.MariaDB, name string, clientset *kubernetes.Clientset,
 	logger logr.Logger) error {
 	return wait.PollImmediateUntilWithContext(ctx, 1*time.Second, func(context.Context) (bool, error) {
-		previousPod, err := clientset.CoreV1().Pods(mariadb.Namespace).Get(ctx, previousPodName, metav1.GetOptions{})
+		pod, err := clientset.CoreV1().Pods(mariadb.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			logger.V(1).Info("Error getting previous Pod", "err", err)
+			logger.V(1).Info("Error getting Pod", "err", err)
 			return false, nil
 		}
-		if !pod.PodReady(previousPod) {
-			logger.V(1).Info("Previous Pod not ready", "pod", previousPodName)
+		if !mariadbpod.PodReady(pod) {
+			logger.V(1).Info("Pod not ready", "pod", previousPodName)
 			return false, nil
 		}
-		logger.V(1).Info("Previous Pod ready", "pod", previousPodName)
+		logger.V(1).Info("Pod ready", "pod", previousPodName)
 		return true, nil
 	})
 }
