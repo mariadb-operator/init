@@ -69,7 +69,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating logger: %v", err)
 	}
-	logger.Info("Staring init")
+	logger.Info("Statring init")
 
 	env, err := env()
 	if err != nil {
