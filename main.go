@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -14,16 +13,16 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/mariadb-operator/agent/pkg/filemanager"
+	"github.com/mariadb-operator/agent/pkg/kubeclientset"
 	"github.com/mariadb-operator/agent/pkg/logger"
 	"github.com/mariadb-operator/init/pkg/config"
+	"github.com/mariadb-operator/init/pkg/environment"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	mariadbpod "github.com/mariadb-operator/mariadb-operator/pkg/pod"
 	"github.com/mariadb-operator/mariadb-operator/pkg/statefulset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -35,11 +34,6 @@ var (
 	mariadbName      string
 	mariadbNamespace string
 )
-
-type environment struct {
-	podName             string
-	mariadbRootPassword string
-}
 
 func main() {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level to use, one of: debug, info, warn, error, dpanic, panic, fatal.")
@@ -71,18 +65,13 @@ func main() {
 	}
 	logger.Info("Statring init")
 
-	env, err := env()
+	env, err := environment.GetEnvironment(ctx)
 	if err != nil {
-		logger.Error(err, "Missing environment variables")
+		logger.Error(err, "Error getting environment variables")
 		os.Exit(1)
 	}
 
-	restConfig, err := restConfig()
-	if err != nil {
-		logger.Error(err, "Error getting Kubernetes config")
-		os.Exit(1)
-	}
-	clientset, err := kubernetes.NewForConfig(restConfig)
+	clientset, err := kubeclientset.NewKubeclientSet()
 	if err != nil {
 		logger.Error(err, "Error creating Kubernetes clientset")
 		os.Exit(1)
@@ -98,7 +87,7 @@ func main() {
 		logger.Error(err, "Error creating file manager")
 		os.Exit(1)
 	}
-	configBytes, err := config.NewConfigFile(mdb).Marshal(env.podName, env.mariadbRootPassword)
+	configBytes, err := config.NewConfigFile(mdb).Marshal(env.PodName, env.MariadbRootPassword)
 	if err != nil {
 		logger.Error(err, "Error getting Galera config")
 		os.Exit(1)
@@ -119,9 +108,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	idx, err := statefulset.PodIndex(env.podName)
+	idx, err := statefulset.PodIndex(env.PodName)
 	if err != nil {
-		logger.Error(err, "error getting index from Pod", "pod", env.podName)
+		logger.Error(err, "error getting index from Pod", "pod", env.PodName)
 		os.Exit(1)
 	}
 	if *idx == 0 {
@@ -145,28 +134,6 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("Init done")
-}
-
-func env() (*environment, error) {
-	podName := os.Getenv("POD_NAME")
-	if podName == "" {
-		return nil, errors.New("environment variable 'POD_NAME' is required")
-	}
-	mariadbRootPassword := os.Getenv("MARIADB_ROOT_PASSWORD")
-	if mariadbRootPassword == "" {
-		return nil, errors.New("environment variable 'MARIADB_ROOT_PASSWORD' is required")
-	}
-	return &environment{
-		podName:             podName,
-		mariadbRootPassword: mariadbRootPassword,
-	}, nil
-}
-
-func restConfig() (*rest.Config, error) {
-	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
-		return clientcmd.BuildConfigFromFlags("", kubeconfig)
-	}
-	return rest.InClusterConfig()
 }
 
 func mariadb(ctx context.Context, name, namespace string, clientset *kubernetes.Clientset) (*mariadbv1alpha1.MariaDB, error) {

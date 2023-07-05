@@ -28,7 +28,6 @@ dir: ## Create config and state directories for local development.
 
 export KUBECONFIG ?= $(HOME)/.kube/config
 export POD_NAME ?= mariadb-galera-0
-export POD_NAMESPACE ?= default
 export MARIADB_ROOT_PASSWORD ?= mariadb
 RUN_FLAGS ?= --log-dev --log-level=debug --log-time-encoder=iso8601 --mariadb-name=mariadb-galera --mariadb-namespace=default --config-dir=mariadb/config --state-dir=mariadb/state
 .PHONY: run
