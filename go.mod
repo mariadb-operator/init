@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/go-logr/logr v1.2.4
 	github.com/mariadb-operator/agent v0.0.2-0.20230705212819-67aac2bf05b9
-	github.com/mariadb-operator/mariadb-operator v0.0.16-0.20230702105210-e7121043bc33
+	github.com/mariadb-operator/mariadb-operator v0.0.16-0.20230708114737-3113ca8f7467
 	github.com/sethvargo/go-envconfig v0.9.0
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.24.2

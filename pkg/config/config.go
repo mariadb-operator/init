@@ -32,6 +32,10 @@ func NewConfigFile(mariadb *mariadbv1alpha1.MariaDB) *ConfigFile {
 }
 
 func (c *ConfigFile) Marshal(podName, mariadbRootPassword string) ([]byte, error) {
+	galera := c.mariadb.Galera()
+	if !galera.Enabled {
+		return nil, errors.New("MariaDB Galera not enabled, unable to render config file")
+	}
 	tpl := createTpl("galera", `[mysqld]
 bind-address=0.0.0.0
 default_storage_engine=InnoDB
@@ -58,7 +62,7 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster address: %v", err)
 	}
-	sst, err := c.mariadb.Spec.Galera.SST.MariaDBFormat()
+	sst, err := galera.SST.MariaDBFormat()
 	if err != nil {
 		return nil, fmt.Errorf("error getting SST: %v", err)
 	}
@@ -73,14 +77,14 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 		RootPassword   string
 	}{
 		ClusterAddress: clusterAddr,
-		Threads:        c.mariadb.Spec.Galera.ReplicaThreads,
+		Threads:        *galera.ReplicaThreads,
 		Pod:            podName,
 		Service: statefulset.ServiceFQDNWithService(
 			c.mariadb.ObjectMeta,
 			ctrlresources.InternalServiceKey(c.mariadb).Name,
 		),
 		SST:          sst,
-		SSTAuth:      c.mariadb.Spec.Galera.SST == mariadbv1alpha1.SSTMariaBackup || c.mariadb.Spec.Galera.SST == mariadbv1alpha1.SSTMysqldump,
+		SSTAuth:      *galera.SST == mariadbv1alpha1.SSTMariaBackup || *galera.SST == mariadbv1alpha1.SSTMysqldump,
 		RootPassword: mariadbRootPassword,
 	})
 	if err != nil {
