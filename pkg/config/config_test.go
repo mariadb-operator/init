@@ -25,8 +25,36 @@ func TestConfigMarshal(t *testing.T) {
 				},
 				Spec: mariadbv1alpha1.MariaDBSpec{
 					Galera: &mariadbv1alpha1.Galera{
-						SST:            mariadbv1alpha1.SSTRsync,
-						ReplicaThreads: 1,
+						Enabled: true,
+						GaleraSpec: mariadbv1alpha1.GaleraSpec{
+							SST: func() *mariadbv1alpha1.SST {
+								s := mariadbv1alpha1.SSTRsync
+								return &s
+							}(),
+							ReplicaThreads: func() *int {
+								r := 1
+								return &r
+							}(),
+						},
+					},
+					Replicas: 0,
+				},
+			},
+			podName:             "mariadb-galera-0",
+			mariadbRootPassword: "mariadb",
+			wantConfig:          "",
+			wantErr:             true,
+		},
+		{
+			name: "Galera not enabled",
+			mariadb: &mariadbv1alpha1.MariaDB{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "mariadb-galera",
+					Namespace: "default",
+				},
+				Spec: mariadbv1alpha1.MariaDBSpec{
+					Galera: &mariadbv1alpha1.Galera{
+						Enabled: false,
 					},
 					Replicas: 0,
 				},
@@ -45,8 +73,17 @@ func TestConfigMarshal(t *testing.T) {
 				},
 				Spec: mariadbv1alpha1.MariaDBSpec{
 					Galera: &mariadbv1alpha1.Galera{
-						SST:            mariadbv1alpha1.SSTRsync,
-						ReplicaThreads: 1,
+						Enabled: true,
+						GaleraSpec: mariadbv1alpha1.GaleraSpec{
+							SST: func() *mariadbv1alpha1.SST {
+								s := mariadbv1alpha1.SSTRsync
+								return &s
+							}(),
+							ReplicaThreads: func() *int {
+								r := 1
+								return &r
+							}(),
+						},
 					},
 					Replicas: 3,
 				},
@@ -83,8 +120,17 @@ wsrep_sst_method="rsync"
 				},
 				Spec: mariadbv1alpha1.MariaDBSpec{
 					Galera: &mariadbv1alpha1.Galera{
-						SST:            mariadbv1alpha1.SSTMariaBackup,
-						ReplicaThreads: 2,
+						Enabled: true,
+						GaleraSpec: mariadbv1alpha1.GaleraSpec{
+							SST: func() *mariadbv1alpha1.SST {
+								s := mariadbv1alpha1.SSTMariaBackup
+								return &s
+							}(),
+							ReplicaThreads: func() *int {
+								r := 2
+								return &r
+							}(),
+						},
 					},
 					Replicas: 3,
 				},
