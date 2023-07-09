@@ -63,7 +63,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating logger: %v", err)
 	}
-	logger.Info("Statring init")
+	logger.Info("Starting init")
 
 	env, err := environment.GetEnvironment(ctx)
 	if err != nil {
