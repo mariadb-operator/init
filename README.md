@@ -13,6 +13,7 @@
 # 🍼 init
 Init container for MariaDB that co-operates with [mariadb-operator](https://github.com/mariadb-operator/mariadb-operator). Configure Galera and guarantee ordered deployments for MariaDB.
 - Avoid hacking with bash `initContainers`, do it properly in Go
+- Dynamically provision MariaDB Galera configuration file
 - Get `MariaDB` resources from the Kubernetes API and configure Galera based on them
 - Guarantee MariaDB ordered deployment by checking its `Pod` Ready conditions in the Kubernetes API
 - Allow `spec.podManagementPolicy` = `Parallel` in the MariaDB `StatefulSet`
