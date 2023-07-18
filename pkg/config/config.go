@@ -36,7 +36,7 @@ func (c *ConfigFile) Marshal(podName, mariadbRootPassword string) ([]byte, error
 	if !galera.Enabled {
 		return nil, errors.New("MariaDB Galera not enabled, unable to render config file")
 	}
-	tpl := createTpl("galera", `[mysqld]
+	tpl := createTpl("galera", `[mariadb]
 bind-address=0.0.0.0
 default_storage_engine=InnoDB
 binlog_format=row
