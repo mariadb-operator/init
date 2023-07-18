@@ -91,7 +91,7 @@ func TestConfigMarshal(t *testing.T) {
 			podName:             "mariadb-galera-0",
 			mariadbRootPassword: "mariadb",
 			//nolint:lll
-			wantConfig: `[mysqld]
+			wantConfig: `[mariadb]
 bind-address=0.0.0.0
 default_storage_engine=InnoDB
 binlog_format=row
@@ -138,7 +138,7 @@ wsrep_sst_method="rsync"
 			podName:             "mariadb-galera-1",
 			mariadbRootPassword: "mariadb",
 			//nolint:lll
-			wantConfig: `[mysqld]
+			wantConfig: `[mariadb]
 bind-address=0.0.0.0
 default_storage_engine=InnoDB
 binlog_format=row
