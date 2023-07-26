@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path"
 	"syscall"
 	"time"
 
@@ -104,8 +105,11 @@ func main() {
 		os.Exit(1)
 	}
 	if len(entries) > 0 {
-		logger.Info("Already initialized. Init done")
-		os.Exit(0)
+		info, err := os.Stat(path.Join(stateDir, "grastate.dat"))
+		if !os.IsNotExist(err) && info.Size() > 0 {
+			logger.Info("Already initialized. Init done")
+			os.Exit(0)
+		}
 	}
 
 	idx, err := statefulset.PodIndex(env.PodName)
