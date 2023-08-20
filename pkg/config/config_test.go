@@ -92,7 +92,7 @@ func TestConfigMarshal(t *testing.T) {
 			mariadbRootPassword: "mariadb",
 			//nolint:lll
 			wantConfig: `[mariadb]
-bind-address=0.0.0.0
+bind-address=*
 default_storage_engine=InnoDB
 binlog_format=row
 innodb_autoinc_lock_mode=2
@@ -139,7 +139,7 @@ wsrep_sst_method="rsync"
 			mariadbRootPassword: "mariadb",
 			//nolint:lll
 			wantConfig: `[mariadb]
-bind-address=0.0.0.0
+bind-address=*
 default_storage_engine=InnoDB
 binlog_format=row
 innodb_autoinc_lock_mode=2
