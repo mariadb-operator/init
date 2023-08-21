@@ -66,9 +66,12 @@ sockopt=",pf=ip6"
 `)
 	buf := new(bytes.Buffer)
 	clusterAddr, err := c.clusterAddress()
-	clusterIpFamily, err := c.clusterIpFamily()
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster address: %v", err)
+	}
+	clusterIpFamily, err := c.clusterIpFamily()
+	if err != nil {
+		return nil, fmt.Errorf("error getting cluster ip family: %v", err)
 	}
 	sst, err := galera.SST.MariaDBFormat()
 	if err != nil {
@@ -119,8 +122,11 @@ func (c *ConfigFile) clusterAddress() (string, error) {
 }
 
 func (c *ConfigFile) clusterIpFamily() (string, error) {
-	clusterIP := os.Getenv("MARIADB_GALERA_SERVICE_HOST")
-	parsedIP := net.ParseIP(clusterIP)
+	galeraServiceHost := os.Getenv("MARIADB_GALERA_SERVICE_HOST")
+	if galeraServiceHost == "" {
+		return "", errors.New("error fetching envvar MARIADB_GALERA_SERVICE_HOST")
+	}
+	parsedIP := net.ParseIP(galeraServiceHost)
 	if parsedIP.To4() != nil {
 		return fmt.Sprintf("4"), nil
 	} else {
