@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net"
+	"os"
 	"strings"
 	"text/template"
 
@@ -57,9 +59,14 @@ wsrep_sst_method="{{ .SST }}"
 {{- if .SSTAuth }}
 wsrep_sst_auth="root:{{ .RootPassword }}"
 {{- end }}
+{{- if eq .ClusterIpFamily "6" }}
+[sst]
+sockopt=",pf=ip6"
+{{- end }}
 `)
 	buf := new(bytes.Buffer)
 	clusterAddr, err := c.clusterAddress()
+	clusterIpFamily, err := c.clusterIpFamily()
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster address: %v", err)
 	}
@@ -69,17 +76,19 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 	}
 
 	err = tpl.Execute(buf, struct {
-		ClusterAddress string
-		Threads        int
-		Pod            string
-		Service        string
-		SST            string
-		SSTAuth        bool
-		RootPassword   string
+		ClusterAddress  string
+		ClusterIpFamily string
+		Threads         int
+		Pod             string
+		Service         string
+		SST             string
+		SSTAuth         bool
+		RootPassword    string
 	}{
-		ClusterAddress: clusterAddr,
-		Threads:        *galera.ReplicaThreads,
-		Pod:            podName,
+		ClusterAddress:  clusterAddr,
+		ClusterIpFamily: clusterIpFamily,
+		Threads:         *galera.ReplicaThreads,
+		Pod:             podName,
 		Service: statefulset.ServiceFQDNWithService(
 			c.mariadb.ObjectMeta,
 			ctrlresources.InternalServiceKey(c.mariadb).Name,
@@ -107,6 +116,16 @@ func (c *ConfigFile) clusterAddress() (string, error) {
 		)
 	}
 	return fmt.Sprintf("gcomm://%s", strings.Join(pods, ",")), nil
+}
+
+func (c *ConfigFile) clusterIpFamily() (string, error) {
+	clusterIP := os.Getenv("MARIADB_GALERA_SERVICE_HOST")
+	parsedIP := net.ParseIP(clusterIP)
+	if parsedIP.To4() != nil {
+		return fmt.Sprintf("4"), nil
+	} else {
+		return fmt.Sprintf("6"), nil
+	}
 }
 
 func createTpl(name, t string) *template.Template {
