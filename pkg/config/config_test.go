@@ -103,6 +103,7 @@ wsrep_provider=/usr/lib/galera/libgalera_smm.so
 wsrep_cluster_address="gcomm://mariadb-galera-0.mariadb-galera-internal.default.svc.cluster.local,mariadb-galera-1.mariadb-galera-internal.default.svc.cluster.local,mariadb-galera-2.mariadb-galera-internal.default.svc.cluster.local"
 wsrep_cluster_name=mariadb-operator
 wsrep_slave_threads=1
+wsrep_provider_options="gmcast.listen_addr=tcp://[::]:4567; ist.recv_addr=mariadb-galera-0.mariadb-galera-internal.default.svc.cluster.local:4568"
 
 # Node configuration
 wsrep_node_address="mariadb-galera-0.mariadb-galera-internal.default.svc.cluster.local"
@@ -150,6 +151,7 @@ wsrep_provider=/usr/lib/galera/libgalera_smm.so
 wsrep_cluster_address="gcomm://mariadb-galera-0.mariadb-galera-internal.default.svc.cluster.local,mariadb-galera-1.mariadb-galera-internal.default.svc.cluster.local,mariadb-galera-2.mariadb-galera-internal.default.svc.cluster.local"
 wsrep_cluster_name=mariadb-operator
 wsrep_slave_threads=2
+wsrep_provider_options="gmcast.listen_addr=tcp://[::]:4567; ist.recv_addr=mariadb-galera-1.mariadb-galera-internal.default.svc.cluster.local:4568"
 
 # Node configuration
 wsrep_node_address="mariadb-galera-1.mariadb-galera-internal.default.svc.cluster.local"

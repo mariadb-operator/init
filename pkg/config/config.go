@@ -48,6 +48,7 @@ wsrep_provider=/usr/lib/galera/libgalera_smm.so
 wsrep_cluster_address="{{ .ClusterAddress }}"
 wsrep_cluster_name=mariadb-operator
 wsrep_slave_threads={{ .Threads }}
+wsrep_provider_options="gmcast.listen_addr=tcp://[::]:4567; ist.recv_addr={{ .Pod }}.{{ .Service }}:4568"
 
 # Node configuration
 wsrep_node_address="{{ .Pod }}.{{ .Service }}"
