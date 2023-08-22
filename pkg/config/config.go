@@ -56,6 +56,11 @@ wsrep_sst_method="{{ .SST }}"
 {{- if .SSTAuth }}
 wsrep_sst_auth="root:{{ .RootPassword }}"
 {{- end }}
+{{- if .Ipv6Cluster }}
+wsrep_provider_options="gmcast.listen_addr=tcp://[::]:4567;"
+[sst]
+sockopt=",pf=ip6"
+{{- end }}
 `)
 	buf := new(bytes.Buffer)
 	clusterAddr, err := c.clusterAddress()
@@ -70,6 +75,7 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 	err = tpl.Execute(buf, struct {
 		ClusterAddress string
 		Threads        int
+		Ipv6Cluster    bool
 		Pod            string
 		Service        string
 		SST            string
@@ -78,6 +84,7 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 	}{
 		ClusterAddress: clusterAddr,
 		Threads:        *galera.ReplicaThreads,
+		Ipv6Cluster:    *galera.Ipv6Cluster,
 		Pod:            podName,
 		Service: statefulset.ServiceFQDNWithService(
 			c.mariadb.ObjectMeta,
