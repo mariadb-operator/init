@@ -163,7 +163,7 @@ func previousPodName(mariadb *mariadbv1alpha1.MariaDB, podIndex int) (string, er
 
 func waitForPodReady(ctx context.Context, mariadb *mariadbv1alpha1.MariaDB, name string, clientset *kubernetes.Clientset,
 	logger logr.Logger) error {
-	return wait.PollImmediateUntilWithContext(ctx, 1*time.Second, func(context.Context) (bool, error) {
+	return wait.PollUntilContextCancel(ctx, 1*time.Second, true, func(context.Context) (bool, error) {
 		pod, err := clientset.CoreV1().Pods(mariadb.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			logger.V(1).Info("Error getting Pod", "err", err)
