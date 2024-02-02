@@ -99,6 +99,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	logger.Info("Checking pending SST")
+	if err := deletePendingSST(fileManager, &logger); err != nil {
+		logger.Error(err, "Error deleting pending SST")
+		os.Exit(1)
+	}
+
 	entries, err := os.ReadDir(stateDir)
 	if err != nil {
 		logger.Error(err, "Error reading state directory")
@@ -151,6 +157,20 @@ func mariadb(ctx context.Context, name, namespace string, clientset *kubernetes.
 		return nil, fmt.Errorf("error decoding MariaDB: %v", err)
 	}
 	return &mdb, nil
+}
+
+func deletePendingSST(fileManager *filemanager.FileManager, logger *logr.Logger) error {
+	sstPath := path.Join(stateDir, "sst_in_progress")
+	_, err := os.Stat(sstPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logger.Info("SST pending file does not exist", "path", sstPath)
+			return nil
+		}
+		return err
+	}
+	logger.Info("SST pending does exists. Deleting", "path", sstPath)
+	return fileManager.DeleteStateFile("sst_in_progress")
 }
 
 func previousPodName(mariadb *mariadbv1alpha1.MariaDB, podIndex int) (string, error) {
