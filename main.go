@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,19 +10,19 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/go-logr/logr"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/mariadb-operator/agent/pkg/filemanager"
 	"github.com/mariadb-operator/agent/pkg/kubeclientset"
 	"github.com/mariadb-operator/agent/pkg/logger"
 	"github.com/mariadb-operator/init/pkg/config"
 	"github.com/mariadb-operator/init/pkg/environment"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	mariadbpod "github.com/mariadb-operator/mariadb-operator/pkg/pod"
 	"github.com/mariadb-operator/mariadb-operator/pkg/statefulset"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 )
@@ -133,7 +134,7 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("Waiting for previous Pod to be ready", "pod", previousPodName)
-	if err := waitForPodReady(ctx, mdb, previousPodName, clientset, logger); err != nil {
+	if err := waitForPodReady(ctx, mdb, *idx-1, logger); err != nil {
 		logger.Error(err, "Error waiting for previous Pod to be ready", "pod", previousPodName)
 		os.Exit(1)
 	}
@@ -161,19 +162,31 @@ func previousPodName(mariadb *mariadbv1alpha1.MariaDB, podIndex int) (string, er
 	return statefulset.PodName(mariadb.ObjectMeta, previousPodIndex), nil
 }
 
-func waitForPodReady(ctx context.Context, mariadb *mariadbv1alpha1.MariaDB, name string, clientset *kubernetes.Clientset,
-	logger logr.Logger) error {
+func waitForPodReady(ctx context.Context, mariadb *mariadbv1alpha1.MariaDB, podIndex int, logger logr.Logger) error {
 	return wait.PollUntilContextCancel(ctx, 1*time.Second, true, func(context.Context) (bool, error) {
-		pod, err := clientset.CoreV1().Pods(mariadb.Namespace).Get(ctx, name, metav1.GetOptions{})
+		addr := statefulset.PodFQDNWithService(mariadb.ObjectMeta, podIndex, mariadb.InternalServiceKey().Name)
+		db, err := sql.Open("mysql", fmt.Sprintf("root:MariaDB11!@tcp(%s:3306)/", addr))
 		if err != nil {
-			logger.V(1).Info("Error getting Pod", "err", err)
+			fmt.Println("Error connecting to the database:", err)
 			return false, nil
 		}
-		if !mariadbpod.PodReady(pod) {
-			logger.V(1).Info("Pod not ready", "pod", previousPodName)
+		defer db.Close()
+
+		query := "SELECT variable_value FROM information_schema.global_status WHERE variable_name = 'wsrep_ready'"
+		var wsrepReady string
+		err = db.QueryRow(query).Scan(&wsrepReady)
+		if err != nil {
+			fmt.Println("Error executing query:", err)
 			return false, nil
 		}
-		logger.V(1).Info("Pod ready", "pod", previousPodName)
-		return true, nil
+
+		// Check if the variable is ON
+		if strings.Contains(wsrepReady, "ON") {
+			fmt.Println("Variable is ON")
+			return true, nil
+		}
+
+		fmt.Println("Variable is not ON")
+		return false, nil
 	})
 }

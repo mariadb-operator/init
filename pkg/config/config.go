@@ -9,7 +9,6 @@ import (
 
 	"github.com/mariadb-operator/agent/pkg/galera"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	ctrlresources "github.com/mariadb-operator/mariadb-operator/controller/resource"
 	"github.com/mariadb-operator/mariadb-operator/pkg/statefulset"
 )
 
@@ -81,7 +80,7 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 		Pod:            podName,
 		Service: statefulset.ServiceFQDNWithService(
 			c.mariadb.ObjectMeta,
-			ctrlresources.InternalServiceKey(c.mariadb).Name,
+			c.mariadb.InternalServiceKey().Name,
 		),
 		SST:          sst,
 		SSTAuth:      *galera.SST == mariadbv1alpha1.SSTMariaBackup || *galera.SST == mariadbv1alpha1.SSTMysqldump,
@@ -102,7 +101,7 @@ func (c *ConfigFile) clusterAddress() (string, error) {
 		pods[i] = statefulset.PodFQDNWithService(
 			c.mariadb.ObjectMeta,
 			i,
-			ctrlresources.InternalServiceKey(c.mariadb).Name,
+			c.mariadb.InternalServiceKey().Name,
 		)
 	}
 	return fmt.Sprintf("gcomm://%s", strings.Join(pods, ",")), nil
