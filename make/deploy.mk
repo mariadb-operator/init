@@ -1,4 +1,4 @@
-CLUSTER ?= mdb
+CLUSTER ?= mdb-galera
 
 ##@ Docker
 

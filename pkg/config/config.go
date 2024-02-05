@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"strings"
 	"text/template"
 
 	"github.com/mariadb-operator/agent/pkg/galera"
@@ -96,15 +95,16 @@ func (c *ConfigFile) clusterAddress() (string, error) {
 	if c.mariadb.Spec.Replicas == 0 {
 		return "", errors.New("at least one replica must be specified to get a valid cluster address")
 	}
-	pods := make([]string, c.mariadb.Spec.Replicas)
-	for i := 0; i < int(c.mariadb.Spec.Replicas); i++ {
-		pods[i] = statefulset.PodFQDNWithService(
-			c.mariadb.ObjectMeta,
-			i,
-			c.mariadb.InternalServiceKey().Name,
-		)
-	}
-	return fmt.Sprintf("gcomm://%s", strings.Join(pods, ",")), nil
+	return "gcomm://172.18.0.140,172.18.0.141,172.18.0.142", nil
+	// pods := make([]string, c.mariadb.Spec.Replicas)
+	// for i := 0; i < int(c.mariadb.Spec.Replicas); i++ {
+	// 	pods[i] = statefulset.PodFQDNWithService(
+	// 		c.mariadb.ObjectMeta,
+	// 		i,
+	// 		c.mariadb.InternalServiceKey().Name,
+	// 	)
+	// }
+	// return fmt.Sprintf("gcomm://%s", strings.Join(pods, ",")), nil
 }
 
 func createTpl(name, t string) *template.Template {
