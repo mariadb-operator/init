@@ -8,7 +8,6 @@ import (
 
 	"github.com/mariadb-operator/agent/pkg/galera"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	"github.com/mariadb-operator/mariadb-operator/pkg/statefulset"
 )
 
 const (
@@ -48,7 +47,7 @@ wsrep_cluster_name=mariadb-operator
 wsrep_slave_threads={{ .Threads }}
 
 # Node configuration
-wsrep_node_address="{{ .Pod }}.{{ .Service }}"
+wsrep_node_address="{{ .NodeAddress }}"
 wsrep_node_name="{{ .Pod }}"
 wsrep_sst_method="{{ .SST }}"
 {{- if .SSTAuth }}
@@ -60,6 +59,10 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster address: %v", err)
 	}
+	nodeAddr, err := nodeAddress(podName)
+	if err != nil {
+		return nil, fmt.Errorf("error getting node address. %v", err)
+	}
 	sst, err := galera.SST.MariaDBFormat()
 	if err != nil {
 		return nil, fmt.Errorf("error getting SST: %v", err)
@@ -67,23 +70,20 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 
 	err = tpl.Execute(buf, struct {
 		ClusterAddress string
+		NodeAddress    string
 		Threads        int
 		Pod            string
-		Service        string
 		SST            string
 		SSTAuth        bool
 		RootPassword   string
 	}{
 		ClusterAddress: clusterAddr,
+		NodeAddress:    nodeAddr,
 		Threads:        *galera.ReplicaThreads,
 		Pod:            podName,
-		Service: statefulset.ServiceFQDNWithService(
-			c.mariadb.ObjectMeta,
-			c.mariadb.InternalServiceKey().Name,
-		),
-		SST:          sst,
-		SSTAuth:      *galera.SST == mariadbv1alpha1.SSTMariaBackup || *galera.SST == mariadbv1alpha1.SSTMysqldump,
-		RootPassword: mariadbRootPassword,
+		SST:            sst,
+		SSTAuth:        *galera.SST == mariadbv1alpha1.SSTMariaBackup || *galera.SST == mariadbv1alpha1.SSTMysqldump,
+		RootPassword:   mariadbRootPassword,
 	})
 	if err != nil {
 		return nil, err
@@ -105,6 +105,19 @@ func (c *ConfigFile) clusterAddress() (string, error) {
 	// 	)
 	// }
 	// return fmt.Sprintf("gcomm://%s", strings.Join(pods, ",")), nil
+}
+
+func nodeAddress(podName string) (string, error) {
+	if podName == "mariadb-galera-0" {
+		return "172.18.0.140", nil
+	}
+	if podName == "mariadb-galera-1" {
+		return "172.18.0.141", nil
+	}
+	if podName == "mariadb-galera-2" {
+		return "172.18.0.142", nil
+	}
+	return "", errors.New("no matching Pod for node address")
 }
 
 func createTpl(name, t string) *template.Template {
