@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net"
+	"strings"
 	"text/template"
 
 	"github.com/mariadb-operator/agent/pkg/galera"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	"github.com/mariadb-operator/mariadb-operator/pkg/statefulset"
 )
 
 const (
@@ -59,7 +62,7 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster address: %v", err)
 	}
-	nodeAddr, err := nodeAddress(podName)
+	nodeAddr, err := c.nodeAddress(podName)
 	if err != nil {
 		return nil, fmt.Errorf("error getting node address. %v", err)
 	}
@@ -95,29 +98,37 @@ func (c *ConfigFile) clusterAddress() (string, error) {
 	if c.mariadb.Spec.Replicas == 0 {
 		return "", errors.New("at least one replica must be specified to get a valid cluster address")
 	}
-	return "gcomm://172.18.0.140,172.18.0.141,172.18.0.142", nil
-	// pods := make([]string, c.mariadb.Spec.Replicas)
-	// for i := 0; i < int(c.mariadb.Spec.Replicas); i++ {
-	// 	pods[i] = statefulset.PodFQDNWithService(
-	// 		c.mariadb.ObjectMeta,
-	// 		i,
-	// 		c.mariadb.InternalServiceKey().Name,
-	// 	)
-	// }
-	// return fmt.Sprintf("gcomm://%s", strings.Join(pods, ",")), nil
+	pods := make([]string, c.mariadb.Spec.Replicas)
+	for i := 0; i < int(c.mariadb.Spec.Replicas); i++ {
+		fqdn := statefulset.PodFQDNWithService(
+			c.mariadb.ObjectMeta,
+			i,
+			c.mariadb.InternalServiceKey().Name,
+		)
+		ips, err := net.LookupIP(fqdn)
+		if err != nil {
+			return "", fmt.Errorf("errorf resolving '%s': %v", fqdn, err)
+		}
+		pods[i] = ips[0].To4().String()
+	}
+	return fmt.Sprintf("gcomm://%s", strings.Join(pods, ",")), nil
 }
 
-func nodeAddress(podName string) (string, error) {
-	if podName == "mariadb-galera-0" {
-		return "172.18.0.140", nil
+func (c *ConfigFile) nodeAddress(podName string) (string, error) {
+	i, err := statefulset.PodIndex(podName)
+	if err != nil {
+		return "", fmt.Errorf("error getting index for Pod '%s': %v", podName, err)
 	}
-	if podName == "mariadb-galera-1" {
-		return "172.18.0.141", nil
+	fqdn := statefulset.PodFQDNWithService(
+		c.mariadb.ObjectMeta,
+		*i,
+		c.mariadb.InternalServiceKey().Name,
+	)
+	ips, err := net.LookupIP(fqdn)
+	if err != nil {
+		return "", fmt.Errorf("errorf resolving '%s': %v", fqdn, err)
 	}
-	if podName == "mariadb-galera-2" {
-		return "172.18.0.142", nil
-	}
-	return "", errors.New("no matching Pod for node address")
+	return ips[0].To4().String(), nil
 }
 
 func createTpl(name, t string) *template.Template {

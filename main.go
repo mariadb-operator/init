@@ -95,6 +95,7 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("Configuring Galera")
+	fmt.Println(string(configBytes))
 	if err := fileManager.WriteConfigFile(config.ConfigFileName, configBytes); err != nil {
 		logger.Error(err, "Error writing Galera config")
 		os.Exit(1)
