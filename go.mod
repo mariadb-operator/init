@@ -2,8 +2,6 @@ module github.com/mariadb-operator/init
 
 go 1.21
 
-toolchain go1.21.4
-
 require (
 	github.com/go-logr/logr v1.3.0
 	github.com/mariadb-operator/agent v0.0.3

@@ -105,11 +105,11 @@ func (c *ConfigFile) clusterAddress() (string, error) {
 			i,
 			c.mariadb.InternalServiceKey().Name,
 		)
-		ips, err := net.LookupIP(fqdn)
-		if err != nil {
-			return "", fmt.Errorf("errorf resolving '%s': %v", fqdn, err)
-		}
-		pods[i] = ips[0].To4().String()
+		// ips, err := net.LookupIP(fqdn)
+		// if err != nil {
+		// 	return "", fmt.Errorf("errorf resolving '%s': %v", fqdn, err)
+		// }
+		pods[i] = fqdn
 	}
 	return fmt.Sprintf("gcomm://%s", strings.Join(pods, ",")), nil
 }
