@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"text/template"
 
 	"github.com/mariadb-operator/agent/pkg/galera"
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	ctrlresources "github.com/mariadb-operator/mariadb-operator/controller/resource"
 	"github.com/mariadb-operator/mariadb-operator/pkg/statefulset"
 )
 
@@ -50,7 +50,7 @@ wsrep_cluster_name=mariadb-operator
 wsrep_slave_threads={{ .Threads }}
 
 # Node configuration
-wsrep_node_address="{{ .Pod }}.{{ .Service }}"
+wsrep_node_address="{{ .NodeAddress }}"
 wsrep_node_name="{{ .Pod }}"
 wsrep_sst_method="{{ .SST }}"
 {{- if .SSTAuth }}
@@ -62,6 +62,10 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster address: %v", err)
 	}
+	nodeAddr, err := c.nodeAddress(podName)
+	if err != nil {
+		return nil, fmt.Errorf("error getting node address. %v", err)
+	}
 	sst, err := galera.SST.MariaDBFormat()
 	if err != nil {
 		return nil, fmt.Errorf("error getting SST: %v", err)
@@ -69,23 +73,20 @@ wsrep_sst_auth="root:{{ .RootPassword }}"
 
 	err = tpl.Execute(buf, struct {
 		ClusterAddress string
+		NodeAddress    string
 		Threads        int
 		Pod            string
-		Service        string
 		SST            string
 		SSTAuth        bool
 		RootPassword   string
 	}{
 		ClusterAddress: clusterAddr,
+		NodeAddress:    nodeAddr,
 		Threads:        *galera.ReplicaThreads,
 		Pod:            podName,
-		Service: statefulset.ServiceFQDNWithService(
-			c.mariadb.ObjectMeta,
-			ctrlresources.InternalServiceKey(c.mariadb).Name,
-		),
-		SST:          sst,
-		SSTAuth:      *galera.SST == mariadbv1alpha1.SSTMariaBackup || *galera.SST == mariadbv1alpha1.SSTMysqldump,
-		RootPassword: mariadbRootPassword,
+		SST:            sst,
+		SSTAuth:        *galera.SST == mariadbv1alpha1.SSTMariaBackup || *galera.SST == mariadbv1alpha1.SSTMysqldump,
+		RootPassword:   mariadbRootPassword,
 	})
 	if err != nil {
 		return nil, err
@@ -99,13 +100,35 @@ func (c *ConfigFile) clusterAddress() (string, error) {
 	}
 	pods := make([]string, c.mariadb.Spec.Replicas)
 	for i := 0; i < int(c.mariadb.Spec.Replicas); i++ {
-		pods[i] = statefulset.PodFQDNWithService(
+		fqdn := statefulset.PodFQDNWithService(
 			c.mariadb.ObjectMeta,
 			i,
-			ctrlresources.InternalServiceKey(c.mariadb).Name,
+			c.mariadb.InternalServiceKey().Name,
 		)
+		ips, err := net.LookupIP(fqdn)
+		if err != nil {
+			return "", fmt.Errorf("errorf resolving '%s': %v", fqdn, err)
+		}
+		pods[i] = ips[0].To4().String()
 	}
 	return fmt.Sprintf("gcomm://%s", strings.Join(pods, ",")), nil
+}
+
+func (c *ConfigFile) nodeAddress(podName string) (string, error) {
+	i, err := statefulset.PodIndex(podName)
+	if err != nil {
+		return "", fmt.Errorf("error getting index for Pod '%s': %v", podName, err)
+	}
+	fqdn := statefulset.PodFQDNWithService(
+		c.mariadb.ObjectMeta,
+		*i,
+		c.mariadb.InternalServiceKey().Name,
+	)
+	ips, err := net.LookupIP(fqdn)
+	if err != nil {
+		return "", fmt.Errorf("errorf resolving '%s': %v", fqdn, err)
+	}
+	return ips[0].To4().String(), nil
 }
 
 func createTpl(name, t string) *template.Template {
